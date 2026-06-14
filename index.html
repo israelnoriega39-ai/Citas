@@ -905,9 +905,38 @@ async function saveCita() {
     }
     closeModal();
   } catch (e) {
-    toast('Guardado (sync pendiente)');
+    // Mostrar error real en pantalla para debug
+    const code = e.code || '';
+    const msg  = e.message || '';
+    showDebugError(code, msg);
     closeModal();
   }
+}
+
+function showDebugError(code, msg) {
+  // Crear panel de error visible en pantalla
+  let panel = document.getElementById('debug-panel');
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.id = 'debug-panel';
+    panel.style.cssText = `
+      position:fixed; bottom:80px; left:12px; right:12px; z-index:9999;
+      background:#1e1e2e; color:#f8f8f2; border-radius:12px;
+      padding:14px 16px; font-size:12px; font-family:monospace;
+      box-shadow:0 4px 24px rgba(0,0,0,.5); max-height:200px; overflow-y:auto;
+    `;
+    document.body.appendChild(panel);
+  }
+  panel.innerHTML = `
+    <div style="color:#ff5555;font-weight:700;margin-bottom:6px;">❌ Error al guardar</div>
+    <div style="color:#ffb86c;">Código: ${code || 'desconocido'}</div>
+    <div style="color:#f8f8f2;margin-top:4px;word-break:break-all;">${msg}</div>
+    <button onclick="document.getElementById('debug-panel').remove()"
+      style="margin-top:10px;background:#ff5555;border:none;color:white;
+             padding:4px 12px;border-radius:6px;cursor:pointer;font-size:11px;">
+      Cerrar
+    </button>
+  `;
 }
 
 // ── DELETE ──
