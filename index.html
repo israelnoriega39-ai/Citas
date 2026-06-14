@@ -15,45 +15,71 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import {
-  initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
-  collection, doc, addDoc, updateDoc, deleteDoc,
+  getFirestore, collection, doc, addDoc, updateDoc, deleteDoc,
   onSnapshot, query, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-const firebaseConfig = {
-  apiKey:            "AIzaSyDxXzUBMorQd9opF7tszT8mIstBIcuEhCs",
-  authDomain:        "citas-consultorio-f787f.firebaseapp.com",
-  projectId:         "citas-consultorio-f787f",
-  storageBucket:     "citas-consultorio-f787f.firebasestorage.app",
-  messagingSenderId: "727579241809",
-  appId:             "1:727579241809:web:0ebf5d971d57fb0611f770"
-};
-
-const app  = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-
-// Persistencia offline moderna (sustituye enableIndexedDbPersistence deprecado)
-const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
-});
-
-// ── Exponer al scope global para que el JS inline lo use ──
-window._FB = { auth, db, collection, doc, addDoc, updateDoc, deleteDoc,
-               onSnapshot, query, serverTimestamp, signInWithEmailAndPassword, signOut };
-
-// ── Auth state listener ──
-onAuthStateChanged(auth, user => {
-  if (user) {
-    document.getElementById('screen-login').style.display = 'none';
-    document.getElementById('screen-app').style.display   = 'flex';
-    document.getElementById('user-email').textContent = user.email;
-    window.startApp();
-  } else {
-    document.getElementById('screen-login').style.display = 'flex';
-    document.getElementById('screen-app').style.display   = 'none';
-    if (window._unsubscribeCitas) window._unsubscribeCitas();
+function dbg(msg, color) {
+  let p = document.getElementById('_dbg');
+  if (!p) {
+    p = document.createElement('div');
+    p.id = '_dbg';
+    p.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#1e1e2e;color:#f8f8f2;font-size:11px;font-family:monospace;padding:8px 12px;max-height:45vh;overflow-y:auto;';
+    document.body.prepend(p);
   }
-});
+  const line = document.createElement('div');
+  line.style.color = color || '#f8f8f2';
+  line.style.borderBottom = '1px solid #333';
+  line.style.padding = '3px 0';
+  line.textContent = new Date().toLocaleTimeString() + ' ' + msg;
+  p.appendChild(line);
+  p.scrollTop = p.scrollHeight;
+}
+
+window.clearDbg = () => { const p = document.getElementById('_dbg'); if(p) p.remove(); };
+
+try {
+  const firebaseConfig = {
+    apiKey:            "AIzaSyDxXzUBMorQd9opF7tszT8mIstBIcuEhCs",
+    authDomain:        "citas-consultorio-f787f.firebaseapp.com",
+    projectId:         "citas-consultorio-f787f",
+    storageBucket:     "citas-consultorio-f787f.firebasestorage.app",
+    messagingSenderId: "727579241809",
+    appId:             "1:727579241809:web:0ebf5d971d57fb0611f770"
+  };
+
+  dbg('▶ Iniciando Firebase...', '#8be9fd');
+  const app  = initializeApp(firebaseConfig);
+  dbg('✔ App OK', '#50fa7b');
+
+  const auth = getAuth(app);
+  dbg('✔ Auth OK', '#50fa7b');
+
+  const db = getFirestore(app);
+  dbg('✔ Firestore OK', '#50fa7b');
+
+  window._FB = { auth, db, collection, doc, addDoc, updateDoc, deleteDoc,
+                 onSnapshot, query, serverTimestamp, signInWithEmailAndPassword, signOut };
+  dbg('✔ _FB expuesto', '#50fa7b');
+
+  onAuthStateChanged(auth, user => {
+    if (user) {
+      dbg('✔ Usuario autenticado: ' + user.email, '#50fa7b');
+      document.getElementById('screen-login').style.display = 'none';
+      document.getElementById('screen-app').style.display   = 'flex';
+      document.getElementById('user-email').textContent = user.email;
+      window.startApp();
+    } else {
+      dbg('ℹ Sin sesión activa', '#ffb86c');
+      document.getElementById('screen-login').style.display = 'flex';
+      document.getElementById('screen-app').style.display   = 'none';
+      if (window._unsubscribeCitas) window._unsubscribeCitas();
+    }
+  });
+
+} catch(e) {
+  dbg('❌ ERROR INIT: ' + e.message, '#ff5555');
+}
 </script>
 
 <style>
@@ -893,22 +919,27 @@ async function saveCita() {
 
   const data = { nombre, telefono: tel, fecha, hora, notas };
 
+  dbg('▶ saveCita: intentando guardar...', '#8be9fd');
+  dbg('  nombre=' + nombre + ' fecha=' + fecha + ' hora=' + hora, '#f8f8f2');
+  dbg('  _FB disponible: ' + (!!window._FB), '#f8f8f2');
   try {
     if (id) {
+      dbg('  updateDoc id=' + id, '#ffb86c');
       await updateDoc(doc(db, 'citas', id), data);
       toast('✅ Cita actualizada');
+      dbg('✔ Cita actualizada', '#50fa7b');
     } else {
       data.estado    = 'pendiente';
       data.creado    = serverTimestamp();
-      await addDoc(collection(db, 'citas'), data);
+      dbg('  addDoc...', '#ffb86c');
+      const ref = await addDoc(collection(db, 'citas'), data);
       toast('✅ Cita guardada');
+      dbg('✔ Cita guardada id=' + ref.id, '#50fa7b');
     }
     closeModal();
   } catch (e) {
-    // Mostrar error real en pantalla para debug
-    const code = e.code || '';
-    const msg  = e.message || '';
-    showDebugError(code, msg);
+    dbg('❌ ERROR saveCita: ' + (e.code||'') + ' — ' + e.message, '#ff5555');
+    showDebugError(e.code||'', e.message||'');
     closeModal();
   }
 }
