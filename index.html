@@ -15,14 +15,11 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import {
-  getFirestore, collection, doc, addDoc, updateDoc, deleteDoc,
-  onSnapshot, query, enableIndexedDbPersistence, serverTimestamp
+  initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+  collection, doc, addDoc, updateDoc, deleteDoc,
+  onSnapshot, query, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-// ══════════════════════════════════════════════
-//  🔧 CONFIGURACIÓN FIREBASE — reemplaza estos valores
-//     con los de tu proyecto en console.firebase.google.com
-// ══════════════════════════════════════════════
 const firebaseConfig = {
   apiKey:            "AIzaSyDxXzUBMorQd9opF7tszT8mIstBIcuEhCs",
   authDomain:        "citas-consultorio-f787f.firebaseapp.com",
@@ -34,10 +31,11 @@ const firebaseConfig = {
 
 const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db   = getFirestore(app);
 
-// Persistencia offline — Firestore cachea en IndexedDB automáticamente
-enableIndexedDbPersistence(db).catch(() => {});
+// Persistencia offline moderna (sustituye enableIndexedDbPersistence deprecado)
+const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+});
 
 // ── Exponer al scope global para que el JS inline lo use ──
 window._FB = { auth, db, collection, doc, addDoc, updateDoc, deleteDoc,
