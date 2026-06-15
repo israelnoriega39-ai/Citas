@@ -24,7 +24,7 @@ function dbg(msg, color) {
   if (!p) {
     p = document.createElement('div');
     p.id = '_dbg';
-    p.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#1e1e2e;color:#f8f8f2;font-size:11px;font-family:monospace;padding:8px 12px;max-height:45vh;overflow-y:auto;';
+    p.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:99999;background:#1e1e2e;color:#f8f8f2;font-size:11px;font-family:monospace;padding:8px 12px;max-height:35vh;overflow-y:auto;border-top:2px solid #ff5555;';
     document.body.prepend(p);
   }
   const line = document.createElement('div');
