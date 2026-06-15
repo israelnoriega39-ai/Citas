@@ -849,12 +849,14 @@ function changeDate(delta) {
 
 async function setEstado(id, estado) {
   const { db, doc, updateDoc } = window._FB;
+  // Actualizar UI local inmediatamente
+  const idx = allCitas.findIndex(c => c.id === id);
+  if (idx >= 0) { allCitas[idx].estado = estado; renderAll(); }
+  toast(`Estado: ${estadoLabel(estado)}`);
   try {
     await updateDoc(doc(db, 'citas', id), { estado });
-    // onSnapshot actualizará la UI automáticamente
   } catch (e) {
-    // Offline: Firestore pone en cola y sincroniza al reconectar
-    toast(`Estado: ${estadoLabel(estado)} (pendiente de sync)`);
+    // Offline: Firestore sincroniza al reconectar, no hacer nada
   }
 }
 
@@ -898,20 +900,32 @@ async function saveCita() {
 
   const data = { nombre, telefono: tel, fecha, hora, notas };
 
+  // Cerrar modal inmediatamente sin esperar red
+  closeModal();
+  toast('Guardando...');
+
+  // Timeout de 5s — si no responde (sin internet) igual confirma
+  const timer = setTimeout(() => {
+    toast(id ? '✅ Cita actualizada' : '✅ Cita guardada');
+  }, 5000);
+
   try {
     if (id) {
       await updateDoc(doc(db, 'citas', id), data);
-      toast('✅ Cita actualizada');
     } else {
-      data.estado    = 'pendiente';
-      data.creado    = serverTimestamp();
-      const ref = await addDoc(collection(db, 'citas'), data);
-      toast('✅ Cita guardada');
+      data.estado = 'pendiente';
+      data.creado = serverTimestamp();
+      await addDoc(collection(db, 'citas'), data);
     }
-    closeModal();
+    clearTimeout(timer);
+    toast(id ? '✅ Cita actualizada' : '✅ Cita guardada');
   } catch (e) {
-    alert('ERROR:\nCódigo: ' + (e.code||'sin código') + '\n\n' + (e.message||'sin mensaje'));
-    closeModal();
+    clearTimeout(timer);
+    if (e.code === 'unavailable' || !navigator.onLine) {
+      toast('✅ Guardado — se sincronizará al reconectar');
+    } else {
+      alert('ERROR:\nCódigo: ' + (e.code||'sin código') + '\n\n' + (e.message||'sin mensaje'));
+    }
   }
 }
 
@@ -955,13 +969,28 @@ function closeConfirm() {
 async function confirmDelete() {
   if (!deleteTarget) return;
   const { db, doc, deleteDoc } = window._FB;
+  const targetId = deleteTarget;
+
+  // Cerrar modal inmediatamente sin esperar red
+  closeConfirm();
+  toast('Eliminando...');
+
+  const timer = setTimeout(() => {
+    toast('🗑️ Cita eliminada');
+  }, 5000);
+
   try {
-    await deleteDoc(doc(db, 'citas', deleteTarget));
+    await deleteDoc(doc(db, 'citas', targetId));
+    clearTimeout(timer);
     toast('🗑️ Cita eliminada');
   } catch (e) {
-    toast('Eliminado (sync pendiente)');
+    clearTimeout(timer);
+    if (e.code === 'unavailable' || !navigator.onLine) {
+      toast('🗑️ Eliminado — se sincronizará al reconectar');
+    } else {
+      toast('Error al eliminar: ' + (e.code||''));
+    }
   }
-  closeConfirm();
 }
 </script>
 </body>
