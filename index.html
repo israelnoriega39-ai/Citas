@@ -190,26 +190,15 @@ html, body { height: 100%; font-family: 'Plus Jakarta Sans', system-ui, sans-ser
 .btn-new:hover { opacity: .9; }
 
 /* ── Date nav ── */
-.date-nav { display: flex; align-items: center; gap: 6px; padding-bottom: 16px; }
-.date-arrow {
-  background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.15);
-  color: #fff; width: 36px; height: 36px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer; flex-shrink: 0; transition: background .15s; font-size: 0;
-}
-.date-arrow:hover { background: rgba(255,255,255,.22); }
-.date-center { flex: 1; text-align: center; }
-.date-main { font-size: 15px; font-weight: 700; color: #fff; }
-.date-today { display: inline-block; margin-top: 4px; background: var(--lavender);
-              font-size: 10px; font-weight: 700; padding: 2px 10px; border-radius: 20px;
-              color: #fff; text-transform: uppercase; letter-spacing: .6px; }
+.date-strip { padding-bottom: 14px; text-align: center; }
+.date-main { font-size: 13px; font-weight: 600; color: rgba(255,255,255,.75); }
 
 /* ═══════════════════════════
    STATS STRIP
 ═══════════════════════════ */
 .stats-wrap {
   background: var(--card); border-bottom: 1px solid var(--border);
-  padding: 0 4px;
+  padding: 0 4px; position: sticky; top: 0; z-index: 90;
 }
 .stats-strip { display: flex; overflow-x: auto; scrollbar-width: none; gap: 0; }
 .stats-strip::-webkit-scrollbar { display: none; }
@@ -243,12 +232,18 @@ html, body { height: 100%; font-family: 'Plus Jakarta Sans', system-ui, sans-ser
 /* ═══════════════════════════
    CITA LIST
 ═══════════════════════════ */
-.main { padding: 14px; max-width: 560px; margin: 0 auto; flex: 1; }
+.main { padding: 10px; flex: 1; }
 
 .section-label {
-  font-size: 11px; font-weight: 700; color: var(--txt-soft);
-  text-transform: uppercase; letter-spacing: .7px;
-  margin: 16px 0 10px 2px;
+  font-size: 12px; font-weight: 700; color: var(--txt-soft);
+  text-transform: uppercase; letter-spacing: .5px;
+  margin: 4px 0 8px 2px; display: flex; align-items: center; gap: 4px;
+}
+.notif-banner {
+  background: var(--lavender-lt); border: 1px solid var(--lavender);
+  border-radius: var(--r-sm); padding: 10px 14px; margin: 10px;
+  font-size: 13px; color: var(--lavender); font-weight: 600;
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
 }
 
 /* Empty */
@@ -261,8 +256,9 @@ html, body { height: 100%; font-family: 'Plus Jakarta Sans', system-ui, sans-ser
 .cita-card {
   background: var(--card); border-radius: var(--r);
   border: 1px solid var(--border); box-shadow: var(--shadow-xs);
-  margin-bottom: 10px; display: flex; overflow: hidden;
+  margin-bottom: 8px; display: flex; overflow: hidden;
   transition: box-shadow .2s; position: relative;
+  width: 100%;
 }
 .cita-card:hover { box-shadow: var(--shadow-sm); }
 
@@ -525,17 +521,8 @@ html, body { height: 100%; font-family: 'Plus Jakarta Sans', system-ui, sans-ser
       </div>
     </div>
 
-    <div class="date-nav">
-      <button class="date-arrow" onclick="changeDate(-1)" aria-label="Día anterior">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8l5 5" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </button>
-      <div class="date-center">
-        <div class="date-main" id="date-display"></div>
-        <div id="today-badge"></div>
-      </div>
-      <button class="date-arrow" onclick="changeDate(1)" aria-label="Día siguiente">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </button>
+    <div class="date-strip">
+      <div class="date-main" id="date-display"></div>
     </div>
   </header>
 
@@ -726,7 +713,52 @@ window.startApp = function() {
   updateOffline();
   renderDate();
   subscribeToFirestore();
+  requestNotificationPermission();
 };
+
+// ── NOTIFICACIONES ──
+function requestNotificationPermission() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+}
+
+function checkMorningNotification() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission !== 'granted') return;
+
+  const now   = new Date();
+  const hour  = now.getHours();
+  const todayISO = toISO(now);
+  const key   = 'notif_shown_' + todayISO;
+
+  // Solo mostrar si es después de las 8am y no se ha mostrado hoy
+  if (hour < 8) return;
+  if (localStorage.getItem(key)) return;
+
+  const citasHoy      = allCitas.filter(c => c.fecha === todayISO);
+  const confirmadas   = citasHoy.filter(c => c.estado === 'confirmado').length;
+  const pendientes    = citasHoy.filter(c => c.estado === 'pendiente').length;
+  const total         = citasHoy.length;
+
+  if (total === 0) return;
+
+  localStorage.setItem(key, '1');
+
+  const body = total === 0
+    ? 'No tienes citas programadas para hoy.'
+    : `Tienes ${confirmadas} cita${confirmadas!==1?'s':''} confirmada${confirmadas!==1?'s':''} y ${pendientes} pendiente${pendientes!==1?'s':''} de confirmar.`;
+
+  try {
+    new Notification('🩺 Buenos días — Resumen del día', {
+      body,
+      icon: 'https://israelnoriega39-ai.github.io/citas-consultorio/icon.png',
+      badge: 'https://israelnoriega39-ai.github.io/citas-consultorio/icon.png',
+      tag: 'morning-summary'
+    });
+  } catch(e) {}
+}
 
 // ═══════════════════════════════════════════
 //  FIRESTORE REALTIME SUBSCRIPTION
@@ -742,10 +774,11 @@ function subscribeToFirestore() {
   window._unsubscribeCitas = onSnapshot(q, snapshot => {
     allCitas = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
     renderAll();
+    checkMorningNotification();
   }, err => {
     console.error(err);
-    // Si falla (sin internet) Firestore igual devuelve cache — el listener sigue activo
     renderAll();
+    checkMorningNotification();
   });
 }
 
@@ -753,9 +786,9 @@ function subscribeToFirestore() {
 //  RENDER
 // ═══════════════════════════════════════════
 function renderDate() {
-  document.getElementById('date-display').textContent = fmtDate(currentDate);
-  const b = document.getElementById('today-badge');
-  b.innerHTML = isToday(currentDate) ? '<span class="date-today">Hoy</span>' : '';
+  const today = new Date();
+  document.getElementById('date-display').textContent =
+    'Hoy: ' + fmtDate(today);
 }
 
 function renderAll() {
@@ -764,8 +797,8 @@ function renderAll() {
 }
 
 function renderStats() {
-  const iso = toISO(currentDate);
-  const hoy = allCitas.filter(c => c.fecha === iso);
+  const todayISO = toISO(new Date());
+  const hoy = allCitas.filter(c => c.fecha === todayISO);
   document.getElementById('s-dia').textContent   = hoy.length;
   document.getElementById('s-pend').textContent  = hoy.filter(c => c.estado === 'pendiente').length;
   document.getElementById('s-conf').textContent  = hoy.filter(c => c.estado === 'confirmado').length;
@@ -774,23 +807,42 @@ function renderStats() {
 }
 
 function renderList() {
-  const iso  = toISO(currentDate);
-  const list = allCitas.filter(c => c.fecha === iso)
-                       .sort((a,b) => (a.hora||'').localeCompare(b.hora||''));
   const root = document.getElementById('list-root');
 
-  if (!list.length) {
+  if (!allCitas.length) {
     root.innerHTML = `
       <div class="empty">
         <div class="empty-icon">📅</div>
-        <h3>Sin citas este día</h3>
+        <h3>Sin citas registradas</h3>
         <p>Toca "Nueva cita" para agendar una.</p>
       </div>`;
     return;
   }
 
-  root.innerHTML = `<div class="section-label">${list.length} cita${list.length>1?'s':''} — ${fmtDate(currentDate)}</div>`
-    + list.map(cardHTML).join('');
+  // Group by date, sorted
+  const groups = {};
+  allCitas.forEach(c => {
+    if (!groups[c.fecha]) groups[c.fecha] = [];
+    groups[c.fecha].push(c);
+  });
+  const sortedDates = Object.keys(groups).sort();
+
+  const todayISO = toISO(new Date());
+
+  let html = '';
+  sortedDates.forEach(fecha => {
+    const list = groups[fecha].sort((a,b) => (a.hora||'').localeCompare(b.hora||''));
+    const [y,m,d] = fecha.split('-').map(Number);
+    const dt = new Date(y, m-1, d);
+    const isHoy = fecha === todayISO;
+    const label = isHoy
+      ? `<span style="background:var(--lavender);color:#fff;padding:2px 8px;border-radius:20px;font-size:10px;margin-left:6px;">HOY</span>`
+      : '';
+    html += `<div class="section-label" style="margin-top:18px;">${fmtDate(dt)}${label} — ${list.length} cita${list.length>1?'s':''}</div>`;
+    html += list.map(cardHTML).join('');
+  });
+
+  root.innerHTML = html;
 }
 
 function estadoLabel(e) {
@@ -842,11 +894,6 @@ function cardHTML(c) {
 // ═══════════════════════════════════════════
 //  ACCIONES
 // ═══════════════════════════════════════════
-function changeDate(delta) {
-  currentDate.setDate(currentDate.getDate() + delta);
-  renderDate(); renderAll();
-}
-
 async function setEstado(id, estado) {
   const { db, doc, updateDoc } = window._FB;
   // Actualizar UI local inmediatamente
@@ -867,7 +914,7 @@ function openModal(citaData = null) {
   document.getElementById('f-id').value      = isEdit ? citaData.id      : '';
   document.getElementById('f-nombre').value  = isEdit ? citaData.nombre  : '';
   document.getElementById('f-tel').value     = isEdit ? citaData.telefono: '';
-  document.getElementById('f-fecha').value   = isEdit ? citaData.fecha   : toISO(currentDate);
+  document.getElementById('f-fecha').value   = isEdit ? citaData.fecha   : toISO(new Date());
   document.getElementById('f-hora').value    = isEdit ? citaData.hora    : '';
   document.getElementById('f-notas').value   = isEdit ? citaData.notas   : '';
   document.getElementById('overlay').classList.add('open');
@@ -878,12 +925,11 @@ function closeModal() {
   el.classList.remove('open');
   el.style.display = 'none';
   setTimeout(() => { el.style.display = ''; }, 300);
-  // Limpiar form
   ['f-id','f-nombre','f-tel','f-hora','f-notas'].forEach(i => {
-    const el = document.getElementById(i);
-    if (el) el.value = '';
+    const inp = document.getElementById(i);
+    if (inp) inp.value = '';
   });
-  document.getElementById('f-fecha').value = toISO(currentDate);
+  document.getElementById('f-fecha').value = toISO(new Date());
 }
 function handleOverlay(e) {
   if (e.target === document.getElementById('overlay')) closeModal();
