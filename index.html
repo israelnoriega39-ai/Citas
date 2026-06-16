@@ -874,7 +874,16 @@ function openModal(citaData = null) {
   setTimeout(() => document.getElementById('f-nombre').focus(), 340);
 }
 function closeModal() {
-  document.getElementById('overlay').classList.remove('open');
+  const el = document.getElementById('overlay');
+  el.classList.remove('open');
+  el.style.display = 'none';
+  setTimeout(() => { el.style.display = ''; }, 300);
+  // Limpiar form
+  ['f-id','f-nombre','f-tel','f-hora','f-notas'].forEach(i => {
+    const el = document.getElementById(i);
+    if (el) el.value = '';
+  });
+  document.getElementById('f-fecha').value = toISO(currentDate);
 }
 function handleOverlay(e) {
   if (e.target === document.getElementById('overlay')) closeModal();
@@ -964,7 +973,10 @@ function askDelete(id, nombre) {
 }
 function closeConfirm() {
   deleteTarget = null;
-  document.getElementById('confirm-overlay').classList.remove('open');
+  const el = document.getElementById('confirm-overlay');
+  el.classList.remove('open');
+  el.style.display = 'none';
+  setTimeout(() => { el.style.display = ''; }, 300);
 }
 async function confirmDelete() {
   if (!deleteTarget) return;
