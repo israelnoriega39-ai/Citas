@@ -12,7 +12,7 @@
 <!-- Firebase SDK -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
+import { initializeAuth, indexedDBLocalPersistence, signInWithEmailAndPassword, signOut, onAuthStateChanged }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
@@ -36,7 +36,9 @@ try {
 
   const app  = initializeApp(firebaseConfig);
 
-  const auth = getAuth(app);
+  const auth = initializeAuth(app, {
+    persistence: indexedDBLocalPersistence
+  });
 
   const db = initializeFirestore(app, {
     localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
